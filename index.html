@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>AR Measure & Place</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="./AR.js/aframe/build/aframe-ar.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+  <a-scene embedded ar>
+    <!-- Camera -->
+    <a-camera ar-raycaster="objects: .interactive" cursor="fuse: false"></a-camera>
+
+    <!-- Lighting -->
+    <a-light type="directional" position="0 5 10" intensity="1.5"></a-light>
+
+    <!-- Assets -->
+    <a-assets>
+      <a-asset-item id="window-model" src="./blind1/scene.gltf"></a-asset-item>
+    </a-assets>
+
+    <!-- Rectangle Spawner -->
+    <a-entity rectangle-drawer></a-entity>
+  </a-scene>
+
+  <script>
+    AFRAME.registerComponent('rectangle-drawer', {
+      init: function () {
+        const scene = this.el.sceneEl;
+        const cursor = document.querySelector('[ar-raycaster]');
+        let startPoint = null;
+        let currentRectangle = null;
+        let isDragging = false;
+
+        // Use both 'mousedown' for desktop and 'touchstart' for mobile
+        cursor.addEventListener('mousedown', (event) => handleInteraction(event));
+        cursor.addEventListener('touchstart', (event) => handleInteraction(event));
+
+        // Handle interaction (click or touch)
+        function handleInteraction(event) {
+          event.preventDefault();  // Prevent default behavior (e.g., scrolling)
+
+          const intersection = event.detail.intersections[0]?.point;
+
+          if (!startPoint) {
+            // First click/touch: Start point of the rectangle
+            startPoint = intersection;
+            currentRectangle = document.createElement('a-plane');
+            currentRectangle.setAttribute('class', 'interactive');
+            currentRectangle.setAttribute('color', '#00ff00');
+            currentRectangle.setAttribute('opacity', '0.5');
+            currentRectangle.setAttribute('rotation', '-90 0 0');
+            currentRectangle.setAttribute('position', intersection);
+            scene.appendChild(currentRectangle);
+          } else if (!isDragging) {
+            // Second click/touch: Start dragging
+            isDragging = true;
+          } else {
+            // Third click/touch: Finalize and spawn the model
+            spawnWindow(currentRectangle);
+            startPoint = null;
+            isDragging = false;
+            currentRectangle = null;
+          }
+        }
+
+        // Use 'mousemove' for desktop and 'touchmove' for mobile
+        scene.addEventListener('mousemove', (event) => handleDrag(event));
+        scene.addEventListener('touchmove', (event) => handleDrag(event));
+
+        // Handle rectangle dragging
+        function handleDrag(event) {
+          event.preventDefault();  // Prevent default behavior
+
+          if (isDragging && startPoint && currentRectangle) {
+            const intersection = event.detail.intersections[0]?.point;
+            if (!intersection) return;
+
+            const width = Math.abs(intersection.x - startPoint.x);
+            const height = Math.abs(intersection.z - startPoint.z);
+            currentRectangle.setAttribute('width', width);
+            currentRectangle.setAttribute('height', height);
+            currentRectangle.setAttribute('position', {
+              x: (intersection.x + startPoint.x) / 2,
+              y: 0,
+              z: (intersection.z + startPoint.z) / 2,
+            });
+          }
+        }
+      },
+    });
+
+    // Function to spawn the 3D window model
+    function spawnWindow(rectangle) {
+      const scene = rectangle.sceneEl;
+      const position = rectangle.getAttribute('position');
+      const scale = {
+        x: rectangle.getAttribute('width'),
+        y: 1,
+        z: rectangle.getAttribute('height'),
+      };
+
+      // Create and configure the 3D window model
+      const model = document.createElement('a-entity');
+      model.setAttribute('gltf-model', '#window-model');
+      model.setAttribute('position', position);
+      model.setAttribute('scale', `${scale.x} ${scale.y} ${scale.z}`);
+      scene.appendChild(model);
+
+      // Remove the rectangle
+      rectangle.parentNode.removeChild(rectangle);
+    }
+  </script>
+</body>
+</html>
